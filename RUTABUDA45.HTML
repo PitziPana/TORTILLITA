@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Listado de Rutas y Mapa desde Hotel Aquincum</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCA74CXczmCw8ar1Sj-xZislpoqQGkLQHA&libraries=directions,geometry"></script>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <table>
+        <thead>
+            <tr>
+                <th>Destino</th>
+                <th>Coordenadas</th>
+                <th>Distancia a Pie</th>
+                <th>Tiempo a Pie</th>
+                <th>Transporte Público</th>
+                <th>Línea de Transporte</th>
+                <th>Tiempo en Transporte Público</th>
+            </tr>
+        </thead>
+        <tbody id="routes-table-body">
+        </tbody>
+    </table>
+    <div id="map"></div>    <script>
+        var directionsRenderer;  // Definir directionsRenderer globalmente
+
+        function initMap() {
+            var directionsService = new google.maps.DirectionsService();
+            directionsRenderer = new google.maps.DirectionsRenderer();  // Inicializar directionsRenderer
+            var geocoder = new google.maps.Geocoder();
+            var map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 13,
+                center: {lat: 47.5392, lng: 19.0456}  // Hotel Aquincum
+            });
+            directionsRenderer.setMap(map);
+
+            var infowindow = new google.maps.InfoWindow();
+            var markers = [];
+            var locations = {
+                "Margaret Island": {lat: 47.5311, lng: 19.0492},
+                "Parlamento de Hungría": {lat: 47.5074, lng: 19.0463},
+                "Deák Ferenc tér (Centro)": {lat: 47.4979, lng: 19.0543},
+                "Basílica de San Esteban": {lat: 47.5009, lng: 19.0535},
+                "Árpád híd (Tranvía)": {lat: 47.5316, lng: 19.0701},
+                "Castillo de Buda": {lat: 47.4962, lng: 19.0399},
+                "Barrio Judío": {lat: 47.4971, lng: 19.0611},
+                "Mercado Central de Budapest": {lat: 47.488, lng: 19.0581},
+                "Puente de las Cadenas": {lat: 47.498, lng: 19.0452},
+                "Ópera Estatal de Hungría": {lat: 47.5023, lng: 19.0584},
+                "Iglesia de San Matías": {lat: 47.5015, lng: 19.0343},
+                "Gran Sinagoga de Budapest": {lat: 47.4936, lng: 19.0601},
+                "Váci utca": {lat: 47.4925, lng: 19.0534},
+                "Colina Gellért": {lat: 47.4867, lng: 19.0462},
+                "Szentendre": {lat: 47.6699, lng: 19.0713},
+                "Ráckeve": {lat: 47.1635, lng: 18.9450},
+                "Pécel": {lat: 47.4991, lng: 19.3325},
+                "Museo Nacional Húngaro": {lat: 47.4913, lng: 19.0611},
+                "Plaza de los Héroes": {lat: 47.5144, lng: 19.0779},
+                "Baños Széchenyi": {lat: 47.5189, lng: 19.0810},
+                "Isla Margarita": {lat: 47.5311, lng: 19.0492},
+                "Avenida Andrassy": {lat: 47.5051, lng: 19.0649},
+                "Museo de Bellas Artes": {lat: 47.5165, lng: 19.0761},
+                "Café Gerbeaud": {lat: 47.4979, lng: 19.0513},
+                "Parque de la Ciudad": {lat: 47.5143, lng: 19.0819},
+                "Parque Memento": {lat: 47.4545, lng: 19.0241},
+                "Museo Ludwig": {lat: 47.4687, lng: 19.0730},
+                "Barrio del Castillo": {lat: 47.4979, lng: 19.0399},
+                "Plaza Vorosmarty": {lat: 47.4972, lng: 19.0493},
+                "Puente de Isabel": {lat: 47.4932, lng: 19.0524}
+            };
+
+            var sortedLocations = Object.keys(locations).map(function(name) {
+                var location = locations[name];
+                var distance = google.maps.geometry.spherical.computeDistanceBetween(
+                    new google.maps.LatLng(47.5392, 19.0456), 
+                    new google.maps.LatLng(location.lat, location.lng)
+                );
+                return {name: name, location: location, distance: distance};
+            }).sort(function(a, b) {
+                return a.distance - b.distance;
+            });
+
+            var tableBody = document.getElementById('routes-table-body');            sortedLocations.forEach(function(loc, index) {
+                var name = loc.name;
+                var location = loc.location;
+
+                // Añadir marcador numerado
+                var marker = new google.maps.Marker({
+                    position: location,
+                    label: (index + 1).toString(),
+                    map: map
+                });
+                markers.push(marker);
+
+                var contentString = '<div><strong>' + (index + 1) + '. ' + name + '</strong><br>' +
+                    '<a href="#" onclick="calculateAndDisplayRoute(\'' + name + '\', \'WALKING\')">Ruta a pie</a><br>' +
+                    '<a href="#" onclick="calculateAndDisplayRoute(\'' + name + '\', \'TRANSIT\')">Ruta en transporte público</a></div>';
+
+                google.maps.event.addListener(marker, 'click', function() {
+                    infowindow.setContent(contentString);
+                    infowindow.open(map, marker);
+                });
+
+                var row = tableBody.insertRow();
+                row.insertCell(0).innerText = (index + 1) + '. ' + name;
+                row.insertCell(1).innerText = location.lat + ', ' + location.lng;
+
+                // Calcular la ruta a pie
+                directionsService.route({
+                    origin: {lat: 47.5392, lng: 19.0456},  // Hotel Aquincum
+                    destination: location,
+                    travelMode: 'WALKING'
+                }, function(response, status) {
+                    if (status === 'OK') {
+                        var route = response.routes[0].legs[0];
+                        row.insertCell(2).innerText = route.distance.text;
+                        row.insertCell(3).innerText = route.duration.text;
+                    } else {
+                        row.insertCell(2).innerText = 'NA';
+                        row.insertCell(3).innerText = 'NA';
+                    }
+                });
+
+                // Calcular la ruta en transporte público
+                directionsService.route({
+                    origin: {lat: 47.5392, lng: 19.0456},  // Hotel Aquincum
+                    destination: location,
+                    travelMode: 'TRANSIT',
+                    transitOptions: {
+                        modes: ['RAIL', 'TRAM'],
+                        routingPreference: 'FEWER_TRANSFERS'
+                    }
+                }, function(response, status) {
+                    if (status === 'OK') {
+                        var route = response.routes[0].legs[0];
+                        var transitLine = route.steps.filter(step => step.travel_mode === 'TRANSIT')
+                                                     .map(step => step.transit.line.short_name)
+                                                     .join(', ');
+                        row.insertCell(4).innerText = route.distance.text;
+                        row.insertCell(5).innerText = transitLine || 'NA';
+                        row.insertCell(6).innerText = route.duration.text;
+                    } else {
+                        row.insertCell(4).innerText = 'NA';
+                        row.insertCell(5).innerText = 'NA';
+                        row.insertCell(6).innerText = 'NA';
+                    }
+                });
+            });
+        }        window.calculateAndDisplayRoute = function(destination, travelMode) {
+            var directionsService = new google.maps.DirectionsService();
+            directionsRenderer.setMap(map);  // Usar directionsRenderer global
+            var locations = {
+                "Margaret Island": {lat: 47.5311, lng: 19.0492},
+                "Parlamento de Hungría": {lat: 47.5074, lng: 19.0463},
+                "Deák Ferenc tér (Centro)": {lat: 47.4979, lng: 19.0543},
+                "Basílica de San Esteban": {lat: 47.5009, lng: 19.0535},
+                "Árpád híd (Tranvía)": {lat: 47.5316, lng: 19.0701},
+                "Castillo de Buda": {lat: 47.4962, lng: 19.0399},
+                "Barrio Judío": {lat: 47.4971, lng: 19.0611},
+                "Mercado Central de Budapest": {lat: 47.488, lng: 19.0581},
+                "Puente de las Cadenas": {lat: 47.498, lng: 19.0452},
+                "Ópera Estatal de Hungría": {lat: 47.5023, lng: 19.0584},
+                "Iglesia de San Matías": {lat: 47.5015, lng: 19.0343},
+                "Gran Sinagoga de Budapest": {lat: 47.4936, lng: 19.0601},
+                "Váci utca": {lat: 47.4925, lng: 19.0534},
+                "Colina Gellért": {lat: 47.4867, lng: 19.0462},
+                "Szentendre": {lat: 47.6699, lng: 19.0713},
+                "Ráckeve": {lat: 47.1635, lng: 18.9450},
+                "Pécel": {lat: 47.4991, lng: 19.3325},
+                "Museo Nacional Húngaro": {lat: 47.4913, lng: 19.0611},
+                "Plaza de los Héroes": {lat: 47.5144, lng: 19.0779},
+                "Baños Széchenyi": {lat: 47.5189, lng: 19.0810},
+                "Isla Margarita": {lat: 47.5311, lng: 19.0492},
+                "Avenida Andrassy": {lat: 47.5051, lng: 19.0649},
+                "Museo de Bellas Artes": {lat: 47.5165, lng: 19.0761},
+                "Café Gerbeaud": {lat: 47.4979, lng: 19.0513},
+                "Parque de la Ciudad": {lat: 47.5143, lng: 19.0819},
+                "Parque Memento": {lat: 47.4545, lng: 19.0241},
+                "Museo Ludwig": {lat: 47.4687, lng: 19.0730},
+                "Barrio del Castillo": {lat: 47.4979, lng: 19.0399},
+                "Plaza Vorosmarty": {lat: 47.4972, lng: 19.0493},
+                "Puente de Isabel": {lat: 47.4932, lng: 19.0524}
+            };
+
+            var locationCoords = locations[destination];
+            if (!locationCoords) {
+                alert("Destino no encontrado.");
+                return;
+            }
+
+            directionsService.route({
+                origin: {lat: 47.5392, lng: 19.0456},  // Hotel Aquincum
+                destination: locationCoords,
+                travelMode: travelMode
+            }, function(response, status) {
+                if (status === 'OK') {
+                    directionsRenderer.setDirections(response);
+                } else {
+                    alert('No se pudo calcular la ruta: ' + status);
+                }
+            });
+        };
+
+        google.maps.event.addDomListener(window, 'load', initMap);
+    </script>
+</body>
+</html>
